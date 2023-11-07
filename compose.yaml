@@ -2,6 +2,36 @@ version: '3'
 
 services:
 ###> doctrine/doctrine-bundle ###
+  app:
+    container_name: app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+    command: [ "php-fpm" ]
+  db:
+    container_name: db
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: 123
+      MYSQL_DATABASE: devo
+    ports:
+      - "3306:3306"
+    restart: unless-stopped
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "82:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d:ro
+      - .:/app
+    depends_on:
+      - app
+    restart: unless-stopped
   database:
     image: postgres:${POSTGRES_VERSION:-15}-alpine
     environment:
@@ -11,10 +41,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-app}
     volumes:
       - database_data:/var/lib/postgresql/data:rw
-      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
-      # - ./docker/db/data:/var/lib/postgresql/data:rw
-###< doctrine/doctrine-bundle ###
-
 volumes:
 ###> doctrine/doctrine-bundle ###
   database_data:

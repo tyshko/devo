@@ -21,28 +21,14 @@ class ToDoRepository extends ServiceEntityRepository
         parent::__construct($registry, ToDo::class);
     }
 
-//    /**
-//     * @return ToDo[] Returns an array of ToDo objects
-//     */
-//    public function findByExampleField($value): array
-//    {
-//        return $this->createQueryBuilder('t')
-//            ->andWhere('t.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->orderBy('t.id', 'ASC')
-//            ->setMaxResults(10)
-//            ->getQuery()
-//            ->getResult()
-//        ;
-//    }
+    public function findAllTodos(int $page = 1, int $limit = 10)
+    {
+        $offset = ($page - 1) * $limit;
 
-//    public function findOneBySomeField($value): ?ToDo
-//    {
-//        return $this->createQueryBuilder('t')
-//            ->andWhere('t.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->getQuery()
-//            ->getOneOrNullResult()
-//        ;
-//    }
+        $qb = $this->createQueryBuilder('t')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        return $qb->getQuery()->getResult();
+    }
 }

@@ -54,7 +54,7 @@ class ToDo
         return $this;
     }
 
-    public function isIsCompleted(): ?bool
+    public function getIsCompleted(): ?bool
     {
         return $this->isCompleted;
     }
