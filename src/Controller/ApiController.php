@@ -25,7 +25,7 @@ class ApiController extends AbstractController
     {
         $data = json_decode($request->getContent(), true);
 
-        if (empty($data['title'])) {
+        if (!isset($data['title']) || trim($data['title']) === '') {
             return $this->json(['message' => 'The title is required'], Response::HTTP_BAD_REQUEST);
         }
 
@@ -48,22 +48,72 @@ class ApiController extends AbstractController
     }
 
     #[Route('/api/todos/{id}', name: 'delete_todo', methods: ['DELETE'])]
-    public function deleteTodo(int $id): JsonResponse
+    public function deleteTodo(int $id, EntityManagerInterface $entityManager): JsonResponse
     {
-        return $this->json(['message' => 'Todo deleted']);
+        $todo = $this->toDoRepository->find($id);
+
+        if (!$todo) {
+            return $this->json(['message' => 'Todo not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $entityManager->remove($todo);
+        $entityManager->flush();
+
+        return $this->json(['message' => 'Todo deleted'], Response::HTTP_OK);
     }
 
+
     #[Route('/api/todos/{id}/complete', name: 'complete_todo', methods: ['PATCH'])]
-    public function completeTodo(int $id): JsonResponse
+    public function completeTodo(int $id, EntityManagerInterface $entityManager): JsonResponse
     {
-        return $this->json(['message' => 'Todo completed']);
+        $todo = $this->toDoRepository->find($id);
+
+        if (!$todo) {
+            return $this->json(['message' => 'Todo not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($todo->getIsCompleted()) {
+            return $this->json(['message' => 'Todo already completed'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $todo->setIsCompleted(true);
+        $todo->setStatus('completed');
+
+        $entityManager->persist($todo);
+        $entityManager->flush();
+
+        return $this->json(['message' => 'Todo marked as completed'], Response::HTTP_OK);
     }
 
     #[Route('/api/todos/{id}', name: 'update_todo', methods: ['PUT'])]
-    public function updateTodo(Request $request, int $id): JsonResponse
+    public function updateTodoTitle(Request $request, int $id, EntityManagerInterface $entityManager): JsonResponse
     {
-        return $this->json(['message' => 'Todo updated']);
+        $data = json_decode($request->getContent(), true);
+
+        if (!isset($data['title']) || trim($data['title']) === '') {
+            return $this->json(['message' => 'The title is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $todo = $this->toDoRepository->find($id);
+
+        if (!$todo) {
+            return $this->json(['message' => 'Todo not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $todo->setTitle($data['title']);
+
+        $entityManager->persist($todo);
+        $entityManager->flush();
+
+        return $this->json([
+            'message' => 'Todo updated',
+            'todo' => [
+                'title' => $todo->getTitle(),
+            ]
+        ], Response::HTTP_OK);
     }
+
+
 
     #[Route('/api/todos', name: 'list_todos', methods: ['GET'])]
     public function listTodos(Request $request): JsonResponse
@@ -71,12 +121,13 @@ class ApiController extends AbstractController
         $page = $request->query->getInt('page', 1);
         $limit = $request->query->getInt('limit', 10);
 
-        $todos = $this->toDoRepository->findAllTodos($page, $limit);
+        $todosArray = $this->toDoRepository->findAllTodos($page, $limit);
 
         return $this->json([
-            'data' => $todos,
+            'data' => $todosArray,
             'page' => $page,
             'limit' => $limit
         ], Response::HTTP_OK);
     }
+
 }
