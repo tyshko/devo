@@ -10,6 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class ApiController extends AbstractController
 {
@@ -31,7 +32,7 @@ class ApiController extends AbstractController
 
         $todo = new ToDo();
         $todo->setTitle($data['title']);
-        $todo->setStatus('new'); // Default status
+        $todo->setStatus('new'); // default status
         $todo->setIsCompleted(false);
         $todo->setViewCount(0);
 
@@ -78,6 +79,7 @@ class ApiController extends AbstractController
 
         $todo->setIsCompleted(true);
         $todo->setStatus('completed');
+        $todo->setViewCount($todo->getViewCount() + 1);
 
         $entityManager->persist($todo);
         $entityManager->flush();
@@ -86,13 +88,14 @@ class ApiController extends AbstractController
     }
 
     #[Route('/api/todos/{id}', name: 'update_todo', methods: ['PUT'])]
-    public function updateTodoTitle(Request $request, int $id, EntityManagerInterface $entityManager): JsonResponse
+    public function updateTodo(
+        Request $request,
+        int $id,
+        EntityManagerInterface $entityManager,
+        ValidatorInterface $validator
+    ): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
-
-        if (!isset($data['title']) || trim($data['title']) === '') {
-            return $this->json(['message' => 'The title is required'], Response::HTTP_BAD_REQUEST);
-        }
 
         $todo = $this->toDoRepository->find($id);
 
@@ -100,7 +103,21 @@ class ApiController extends AbstractController
             return $this->json(['message' => 'Todo not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $todo->setTitle($data['title']);
+        if (isset($data['title'])) {
+            $todo->setTitle($data['title']);
+        }
+
+        if (isset($data['status'])) {
+            $todo->setStatus($data['status']);
+        }
+
+        $errors = $validator->validate($todo);
+
+        if (count($errors) > 0) {
+            return $this->json(['message' => (string) $errors], Response::HTTP_BAD_REQUEST);
+        }
+
+        $todo->setViewCount($todo->getViewCount() + 1);
 
         $entityManager->persist($todo);
         $entityManager->flush();
@@ -109,19 +126,42 @@ class ApiController extends AbstractController
             'message' => 'Todo updated',
             'todo' => [
                 'title' => $todo->getTitle(),
+                'status' => $todo->getStatus(),
             ]
         ], Response::HTTP_OK);
     }
 
-
-
     #[Route('/api/todos', name: 'list_todos', methods: ['GET'])]
-    public function listTodos(Request $request): JsonResponse
+    public function listTodos(Request $request, EntityManagerInterface $entityManager): JsonResponse
     {
         $page = $request->query->getInt('page', 1);
         $limit = $request->query->getInt('limit', 10);
 
-        $todosArray = $this->toDoRepository->findAllTodos($page, $limit);
+        $todos = $this->toDoRepository->findAllTodos($page, $limit);
+        $currentDate = new \DateTime();
+
+        foreach ($todos as $todo) {
+            $currentCount = $todo->getViewCount();
+            $todo->setViewCount($currentCount + 1);
+
+            $interval = $currentDate->diff($todo->getCreatedAt());
+            if ($interval->days > 1 && $todo->getStatus() !== 'completed') {
+                $todo->setStatus('important');
+            }
+
+            $entityManager->persist($todo);
+        }
+
+        $entityManager->flush();
+
+        $todosArray = array_map(function ($todo) {
+            return [
+                'id' => $todo->getId(),
+                'title' => $todo->getTitle(),
+                'status' => $todo->getStatus(),
+                'viewCount' => $todo->getViewCount(),
+            ];
+        }, $todos);
 
         return $this->json([
             'data' => $todosArray,
@@ -129,5 +169,6 @@ class ApiController extends AbstractController
             'limit' => $limit
         ], Response::HTTP_OK);
     }
+
 
 }

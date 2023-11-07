@@ -3,9 +3,13 @@
 namespace App\Entity;
 
 use App\Repository\ToDoRepository;
+use App\Validator\Constraints\ToDoStatusConstraint;
 use Doctrine\ORM\Mapping as ORM;
 
+use DateTimeInterface;
+
 #[ORM\Entity(repositoryClass: ToDoRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 class ToDo
 {
     #[ORM\Id]
@@ -17,6 +21,7 @@ class ToDo
     private ?string $title = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[ToDoStatusConstraint]
     private ?string $status = null;
 
     #[ORM\Column(nullable: true)]
@@ -24,6 +29,12 @@ class ToDo
 
     #[ORM\Column]
     private ?int $viewCount = null;
+
+    #[ORM\Column(type: 'datetime')]
+    private ?DateTimeInterface $createdAt = null;
+
+    #[ORM\Column(type: 'datetime')]
+    private ?DateTimeInterface $updatedAt = null;
 
     public function getId(): ?int
     {
@@ -76,5 +87,27 @@ class ToDo
         $this->viewCount = $viewCount;
 
         return $this;
+    }
+    public function getCreatedAt(): ?DateTimeInterface
+    {
+        return $this->createdAt;
+    }
+
+    #[ORM\PrePersist]
+    public function setCreatedAtValue(): void
+    {
+        $this->createdAt = new \DateTime();
+    }
+
+    public function getUpdatedAt(): ?DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
+
+    #[ORM\PrePersist]
+    #[ORM\PreUpdate]
+    public function setUpdatedAtValue(): void
+    {
+        $this->updatedAt = new \DateTime();
     }
 }
