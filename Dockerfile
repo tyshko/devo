@@ -1,5 +1,6 @@
 # Dockerfile
-FROM php:8.1-fpm-buster
+FROM php:8.2.35-fpm-bookworm
+RUN printf "session.upload_progress.enabled = Off\n" > /usr/local/etc/php/conf.d/zz-security.ini
 
 # Встановлення залежностей
 RUN apt-get update && apt-get install -y \
